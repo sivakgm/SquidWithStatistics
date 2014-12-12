@@ -63,12 +63,44 @@ extern sql::PreparedStatement *pstmt;
 
 //#############################
 
+
+
+
+// ########################## Sending Squid Log to generate the statistics
+
+#include <thread>
+#include <fstream>
+#include <cstdlib>
+#include <time.h>
+
+
+using namespace std;
+
+static int startFlag = 1;
+DBConnection *statLog;
+
+string previousLogDate = "";
+string processDateFromConfFile = "";
+string previousLogYear="",previousLogMonth="",previousLogDay="";
+
+// ##################################
+
+
+
+
 void
 Log::Format::SquidNative(const AccessLogEntry::Pointer &al, Logfile * logfile)
 {
     char hierHost[MAX_IPSTRLEN];
 
     const char *user = NULL;
+
+
+    //#############
+    string currentLogTime,currentLogDate;
+    //##########
+
+
 
 	//Modified for DB log
 	
@@ -119,6 +151,7 @@ Log::Format::SquidNative(const AccessLogEntry::Pointer &al, Logfile * logfile)
     safe_free(user);
 
 //Log insertion DB insertion
+ //**********************************************************************************
 
 	try
 	{
@@ -128,9 +161,11 @@ Log::Format::SquidNative(const AccessLogEntry::Pointer &al, Logfile * logfile)
 			 pstmt->setString(1,boost::lexical_cast<std::string>(current_time.tv_sec));
 
 		//inserting date	
+			currentLogDate = boost::lexical_cast<std::string>(1900 + ltm->tm_year)+"-"+boost::lexical_cast<std::string>(1 + ltm->tm_mon < 10 ?"0":"")+boost::lexical_cast<std::string>(1 + ltm->tm_mon)+"-"+boost::lexical_cast<std::string>((ltm->tm_mday < 10 ?"0":""))+boost::lexical_cast<std::string>(ltm->tm_mday);
 			pstmt->setString(2,boost::lexical_cast<std::string>(1900 + ltm->tm_year)+"-"+boost::lexical_cast<std::string>(1 + ltm->tm_mon < 10 ?"0":"")+boost::lexical_cast<std::string>(1 + ltm->tm_mon)+"-"+boost::lexical_cast<std::string>((ltm->tm_mday < 10 ?"0":""))+boost::lexical_cast<std::string>(ltm->tm_mday));
 
 		//inserting time
+			currentLogTime = boost::lexical_cast<std::string>(ltm->tm_hour)+":"+boost::lexical_cast<std::string>((ltm->tm_min < 10 ?"0":"")) +boost::lexical_cast<std::string>( ltm->tm_min) + ":" + boost::lexical_cast<std::string>(( ltm->tm_sec < 10 ?"0":""))+boost::lexical_cast<std::string>( ltm->tm_sec);
 			pstmt->setString(3,boost::lexical_cast<std::string>(ltm->tm_hour)+":"+boost::lexical_cast<std::string>((ltm->tm_min < 10 ?"0":"")) +boost::lexical_cast<std::string>( ltm->tm_min) + ":" + boost::lexical_cast<std::string>(( ltm->tm_sec < 10 ?"0":""))+boost::lexical_cast<std::string>( ltm->tm_sec));
 		
 			pstmt->setInt(4,al->cache.msec);
@@ -162,7 +197,172 @@ Log::Format::SquidNative(const AccessLogEntry::Pointer &al, Logfile * logfile)
 		syslog(LOG_NOTICE,"MySql Connection Failed");
 	}
 
-//########################
+//********************************************************************************************
+
+
+	//######################## Sending Squid log to generate the statistics##############################
+
+	if(startFlag == 1)
+	{
+		statLog = new DBConnection();
+	}
+
+	string userIp,domain,dateForTN;
+	int pointObj,isnewLogInTable;
+
+	userIp = clientip;
+	domain = parseURLtoDomain(al->url);
+
+	if(currentLogDate != previousLogDate)
+	{
+		previousLogDate = currentLogDate;
+		dateForTN = currentLogDate;
+
+		//Replacing '-' with '_' Ex: 28-12-2014 = 28_12_2014
+		for(unsigned int x=0;x<dateForTN.length();x++)
+		{
+			if(dateForTN[x] == '-')
+			{
+				dateForTN[x]='_';
+			}
+		}
+
+		//Checking whether lastly processed date(which is stored in separate configuration file) is same as current date
+		if((processDateFromConfFile != currentLogDate && processDateFromConfFile != "a") && startFlag == 1)
+		{
+			string temTN = "ud_acc_"+processDateFromConfFile;
+			thread t1(grossStatisticsAcc,temTN);
+			//t1.join();
+
+			temTN = "ud_den_"+processDateFromConfFile;
+			thread t2(grossStatisticsDen,temTN);
+			//t2.join();
+		}
+
+		//checking whether previous log year is same as current log year
+		//           1. If year changes, then new db is created
+		//			 2. For the time, the connection to the database is opened
+		if(previousLogYear != currentLogDate.substr(6,4))
+		{
+			previousLogYear=currentLogDate.substr(6,4);
+			string dbName = "squidStatistics_"+currentLogDate;
+			statLog->dbConnOpen("127.0.0.1","3306","root","simple",dbName);
+			statLog->createStatTable(1,currentLogDate);
+		}
+
+
+		if(previousLogMonth != currentLogDate.substr(3,2))
+		{
+			previousLogMonth = currentLogDate.substr(3,2);
+			statLog->createStatTable(0,previousLogMonth);
+		}
+
+		if(previousLogDay != currentLogDate.substr(0,2))
+		{
+			if(previousLogDay != "")
+			{
+				string temTN = statLog->tableNameAcc;
+
+				insertAllObjDataIntoTable(statLog);
+				thread t1(grossStatisticsAcc,temTN);
+				//t1.join();
+
+				insertAllDenObjDataIntoTable(statLog);
+				temTN = statLog->tableNameDen;;
+				thread t2(grossStatisticsDen,temTN);
+				//t2.join();
+
+			}
+			previousLogDay = currentLogDate.substr(0,2);
+		}
+		statLog->createStatTableName(dateForTN);
+
+	}
+	startFlag = 0;
+
+	/////////////////////////////////////////////////////////
+
+	if(squidLog->res->getString(7) != "TCP_DENIED")
+				{
+					pointObj = checkDataInOBJ(NoACCOBJ,user,domain);
+
+					if(pointObj != -1)
+					{
+						updateDataInObj(statLog,rowDataAcc[pointObj],squidLog->res);
+					}
+					else
+					{
+						if(NoACCOBJ<MAXACCESSOBJ)
+						{
+							createNewObj();
+							pointObj = NoACCOBJ -1;
+						}
+						else
+						{
+							pointObj = getLeastObjPriority();
+							insertObjIntoTable(pointObj,statLog);
+							emptyTheObj(pointObj);
+						}
+
+						isnewLogInTable = checkDataInTable(statLog,statLog->tableNameAcc,user,domain);
+
+						if(isnewLogInTable == 1)
+						{
+							updateObjFromTable(pointObj,statLog->res);
+							updateDataInObj(statLog,rowDataAcc[pointObj],squidLog->res);
+						}
+						else
+						{
+							updateDataInObj(statLog,rowDataAcc[pointObj],squidLog->res);
+						}
+					}
+				}
+				else
+				{
+					pointObj = checkDataInDenOBJ(NoDENOBJ,user,domain);
+
+					if(pointObj != -1)
+					{
+						updateDataInDenObj(statLog,rowDataDen[pointObj],squidLog->res);
+					}
+					else
+					{
+						if(NoDENOBJ<MAXDENIEDOBJ)
+						{
+							createNewDenObj();
+							pointObj = NoDENOBJ -1;
+						}
+						else
+						{
+							pointObj = getLeastDenObjPriority();
+							insertDenObjIntoTable(pointObj,statLog);
+							emptyTheDenObj(pointObj);
+						}
+
+						isnewLogInTable = checkDataInTable(statLog,statLog->tableNameDen,user,domain);
+
+						if(isnewLogInTable == 1)
+						{
+							updateDenObjFromTable(pointObj,statLog->res);
+							updateDataInDenObj(statLog,rowDataDen[pointObj],squidLog->res);
+						}
+						else
+						{
+							updateDataInDenObj(statLog,rowDataDen[pointObj],squidLog->res);
+						}
+					}
+				}
+				tabIndex = squidLog->res->getInt(1);
+				dd = temp;
+
+
+
+	////////////////////////////////////////////////////////
+
+
+
+	//****************** EOD -Sending Squid log to generate the statistics **********************************************
+
 
     if (Config.onoff.log_mime_hdrs) {
         char *ereq = ::Format::QuoteMimeBlob(al->headers.request);
