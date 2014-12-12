@@ -282,13 +282,23 @@ Log::Format::SquidNative(const AccessLogEntry::Pointer &al, Logfile * logfile)
 
 	/////////////////////////////////////////////////////////
 
-	if(squidLog->res->getString(7) != "TCP_DENIED")
-				{
-					pointObj = checkDataInOBJ(NoACCOBJ,user,domain);
+	if( LogTags_str[al->cache.code] != "TCP_DENIED")
+	{
+		logDataAcc *dataLog = new logDataAcc();
+		dataLog->domain = domain;
+		dataLog->response_time = al->cache.msec;
+		dataLog->size = al->cache.replySize;
+		dataLog->status = LogTags_str[al->cache.code]
+		dataLog->tim = currentLogTime;
+		dataLog->user = userIp;
+
+
+
+					pointObj = checkDataInOBJ(NoACCOBJ,userIp,domain);
 
 					if(pointObj != -1)
 					{
-						updateDataInObj(statLog,rowDataAcc[pointObj],squidLog->res);
+						updateDataInObj(statLog,rowDataAcc[pointObj],dataLog);
 					}
 					else
 					{
@@ -304,26 +314,32 @@ Log::Format::SquidNative(const AccessLogEntry::Pointer &al, Logfile * logfile)
 							emptyTheObj(pointObj);
 						}
 
-						isnewLogInTable = checkDataInTable(statLog,statLog->tableNameAcc,user,domain);
+						isnewLogInTable = checkDataInTable(statLog,statLog->tableNameAcc,userIp,domain);
 
 						if(isnewLogInTable == 1)
 						{
 							updateObjFromTable(pointObj,statLog->res);
-							updateDataInObj(statLog,rowDataAcc[pointObj],squidLog->res);
+							updateDataInObj(statLog,rowDataAcc[pointObj],dataLog);
 						}
 						else
 						{
-							updateDataInObj(statLog,rowDataAcc[pointObj],squidLog->res);
+							updateDataInObj(statLog,rowDataAcc[pointObj],dataLog);
 						}
 					}
 				}
 				else
 				{
-					pointObj = checkDataInDenOBJ(NoDENOBJ,user,domain);
+					logDataDen *dataLog = new logDataDen();
+					dataLog->domain = domain;
+					dataLog->tim = currentLogTime;
+					dataLog->user = userIp;
+
+
+					pointObj = checkDataInDenOBJ(NoDENOBJ,userIp,domain);
 
 					if(pointObj != -1)
 					{
-						updateDataInDenObj(statLog,rowDataDen[pointObj],squidLog->res);
+						updateDataInDenObj(statLog,rowDataDen[pointObj],dataLog);
 					}
 					else
 					{
@@ -339,21 +355,21 @@ Log::Format::SquidNative(const AccessLogEntry::Pointer &al, Logfile * logfile)
 							emptyTheDenObj(pointObj);
 						}
 
-						isnewLogInTable = checkDataInTable(statLog,statLog->tableNameDen,user,domain);
+						isnewLogInTable = checkDataInTable(statLog,statLog->tableNameDen,userIp,domain);
 
 						if(isnewLogInTable == 1)
 						{
 							updateDenObjFromTable(pointObj,statLog->res);
-							updateDataInDenObj(statLog,rowDataDen[pointObj],squidLog->res);
+							updateDataInDenObj(statLog,rowDataDen[pointObj],dataLog);
 						}
 						else
 						{
-							updateDataInDenObj(statLog,rowDataDen[pointObj],squidLog->res);
+							updateDataInDenObj(statLog,rowDataDen[pointObj],dataLog);
 						}
 					}
 				}
-				tabIndex = squidLog->res->getInt(1);
-				dd = temp;
+
+	processDateFromConfFile = dateForTN;
 
 
 

@@ -35,7 +35,7 @@ public:
 };
 
 void insertAllDenObjDataIntoTable(DBConnection *statLog);
-void updateDataInDenObj(DBConnection *statLog,RowDataDenied *rowDenData,ResultSet *res);
+void updateDataInDenObj(DBConnection *statLog,RowDataDenied *rowDenData,logDataDen *log);
 int checkDataInDenOBJ(int count,string user,string domain);
 void setDenObjPriority(int lim);
 int getLeastDenObjPriority();

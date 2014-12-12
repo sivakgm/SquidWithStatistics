@@ -171,26 +171,26 @@ void insertObjIntoTable(int pointObj,DBConnection *statLog)
 	}
 }
 
-void updateDataInObj(DBConnection *statLog,RowData *rowdata,ResultSet *res)
+void updateDataInObj(DBConnection *statLog,RowData *rowdata,logDataAcc *log)
 {
 	try
 	{
 		int lim = rowdata->priority;
-		rowdata->user = res->getString(6);
-		rowdata->domain = parseURLtoDomain(res->getString(11));
+		rowdata->user = log->user;
+		rowdata->domain = log->domain;
 		rowdata->connection = rowdata->connection + 1;
-		rowdata->size = rowdata->size + res->getDouble(9);
-		rowdata->response_time = rowdata->response_time + res->getDouble(5);
+		rowdata->size = rowdata->size + log->size;
+		rowdata->response_time = rowdata->response_time + log->response_time;
 		rowdata->priority = 0;
-		if(res->getString(7) == "TCP_HIT" || res->getString(7) == "TCP_MEM_HIT" || res->getString(7) == "UDP_HIT" || res->getString(7) == "UDP_HIT_OBJ")
+		if(log->status == "TCP_HIT" ||log->status == "TCP_MEM_HIT" || log->status == "UDP_HIT" || log->status == "UDP_HIT_OBJ")
 		{
-			rowdata->hit = rowdata->hit + res->getDouble(9);
+			rowdata->hit = rowdata->hit + log->size;
 		}
 		else
 		{
-			rowdata->miss = rowdata->miss + res->getDouble(9) ;
+			rowdata->miss = rowdata->miss + log->size;
 		}
-		insertIntoTableAccTime(rowdata,res->getString(4),statLog->insPstmtAccTime);
+		insertIntoTableAccTime(rowdata,log->tim,statLog->insPstmtAccTime);
 		setObjPriority(lim);
 		return;
 	}

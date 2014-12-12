@@ -50,7 +50,7 @@ void insertObjIntoTable(int pointObj,DBConnection *statLog);
 int getLeastObjPriority();
 void readResSet(DBConnection *logDB);
 int checkDataInOBJ(int count,string user,string domain);
-void updateDataInObj(DBConnection *statLog,RowData *rowdata,ResultSet *res);
+void updateDataInObj(DBConnection *statLog,RowData *rowdata,logDataAcc *res);
 int checkDataInTable(DBConnection *statLog,string tableName,string user,string domain);
 
 

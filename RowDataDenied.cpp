@@ -121,17 +121,17 @@ void setDenObjPriority(int lim)
 	}
 }
 
-void updateDataInDenObj(DBConnection *statLog,RowDataDenied *rowdataden,ResultSet *res)
+void updateDataInDenObj(DBConnection *statLog,RowDataDenied *rowdataden,logDataDen *log)
 {
 	try
 	{
 		int lim = rowdataden->priority;
-		rowdataden->user = res->getString(6);
-		rowdataden->domain = parseURLtoDomain(res->getString(11));
+		rowdataden->user = log->user;
+		rowdataden->domain = log->domain;
 		rowdataden->connection = rowdataden->connection + 1;
 		rowdataden->priority = 0;
 
-		insertIntoTableDenTime(rowdataden,res->getString(4),statLog->insPstmtDenTime);
+		insertIntoTableDenTime(rowdataden,log->tim,statLog->insPstmtDenTime);
 		setDenObjPriority(lim);
 		return;
 	}

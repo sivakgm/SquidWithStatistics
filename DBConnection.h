@@ -8,6 +8,9 @@
 #ifndef DBCONNECTION_H_
 #define DBCONNECTION_H_
 
+
+
+
 #include <iostream>
 #include <string>
 
@@ -30,6 +33,24 @@ class RowDataDenied;
 
 using namespace std;
 using namespace sql;
+
+
+struct logDataAcc
+{
+	string tim;
+	int size;
+	string user;
+	int response_time;
+	string domain;
+	string status;
+};
+
+struct logDataDen
+{
+	string tim;
+	string user;
+	string domain;
+};
 
 
 class DBConnection
